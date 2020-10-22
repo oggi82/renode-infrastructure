@@ -22,6 +22,7 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
             this.outputSpeedResetValue = outputSpeedResetValue;
             this.pullUpPullDownResetValue = pullUpPullDownResetValue;
             Reset();
+            //test
         }
 
         public uint ReadDoubleWord(long offset)
