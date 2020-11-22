@@ -37,7 +37,7 @@
       <HintPath>..\..\..\..\..\..\..\lib\resources\libraries\Moq.dll</HintPath>
     </Reference>
     <Reference Include="nunit.framework">
-      <HintPath>..\..\..\..\..\..\..\lib\resources\tools\nunit.framework.dll</HintPath>
+      <HintPath>..\..\..\..\..\..\..\lib\resources\tools\nunit3\nunit.framework.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -49,6 +49,7 @@
     <Compile Include="BMC050Test.cs" />
     <Compile Include="STMCANTest.cs" />
     <Compile Include="GailserUARTTests.cs" />
+    <Compile Include="LPC43xx_GPIO_Test.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>

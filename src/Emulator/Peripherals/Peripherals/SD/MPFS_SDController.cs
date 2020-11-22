@@ -17,9 +17,6 @@ using Antmicro.Renode.Utilities;
 
 namespace Antmicro.Renode.Peripherals.SD
 {
-    // Features NOT supported:
-    // * interrupts (including: masking)
-    // * CMD8 (from spec 2.0)
     [AllowedTranslations(AllowedTranslation.ByteToDoubleWord | AllowedTranslation.WordToDoubleWord)]
     public class MPFS_SDController : NullRegistrationPointPeripheralContainer<SDCard>, IPeripheralContainer<IPhysicalLayer<byte>, NullRegistrationPoint>, IDoubleWordPeripheral, IProvidesRegisterCollection<DoubleWordRegisterCollection>, IKnownSize, IDisposable
     {
@@ -50,6 +47,7 @@ namespace Antmicro.Renode.Peripherals.SD
             RegistersCollection.Reset();
             irqManager.Reset();
             internalBuffer.Clear();
+            bytesRead = 0;
         }
 
         public void Dispose()
@@ -222,7 +220,12 @@ namespace Antmicro.Renode.Peripherals.SD
                             this.Log(LogLevel.Warning, "Unexpected response type selected: {0}. Ignoring the command response.", responseTypeSelectField.Value);
                             return;
                     }
+
                     ProcessCommand(sdCard, commandIndex.Value);
+
+                    irqManager.SetInterrupt(Interrupts.BufferWriteReady, irqManager.IsEnabled(Interrupts.BufferWriteReady));
+                    irqManager.SetInterrupt(Interrupts.BufferReadReady, irqManager.IsEnabled(Interrupts.BufferReadReady));
+                    irqManager.SetInterrupt(Interrupts.CommandComplete, irqManager.IsEnabled(Interrupts.CommandComplete));
                 })
             ;
 
@@ -256,14 +259,11 @@ namespace Antmicro.Renode.Peripherals.SD
                         this.Log(LogLevel.Warning, "Tried to read data in DMA mode from register that does not support it");
                         return 0;
                     }
-                    var bytes = internalBuffer.DequeueRange(4);
-                    if(!bytes.Any())
+                    if(!internalBuffer.Any())
                     {
-                        irqManager.SetInterrupt(Interrupts.TransferComplete, irqManager.IsEnabled(Interrupts.TransferComplete));
                         return 0;
                     }
-                    irqManager.SetInterrupt(Interrupts.BufferReadReady, irqManager.IsEnabled(Interrupts.BufferReadReady));
-                    return bytes.ToUInt32Smart();
+                    return ReadBuffer();
                 },
                 writeCallback: (_, value) =>
                 {
@@ -278,7 +278,7 @@ namespace Antmicro.Renode.Peripherals.SD
                         this.Log(LogLevel.Warning, "Tried to write data in DMA mode to register that does not support it");
                         return;
                     }
-                    WriteToBuffer(sdCard, BitConverter.GetBytes(value));
+                    WriteBuffer(sdCard, BitConverter.GetBytes(value));
                 })
             ;
 
@@ -338,47 +338,47 @@ namespace Antmicro.Renode.Peripherals.SD
 
         private void ProcessCommand(SDCard sdCard, SDCardCommand command)
         {
-            if(internalBuffer.Any())
-            {
-                this.Log(LogLevel.Debug, "Clearing a non-empty buffer while processing command: {0}", command);
-                internalBuffer.Clear();
-            }
             switch(command)
             {
                 case SDCardCommand.CheckSwitchableFunction:
                     internalBuffer.EnqueueRange(sdCard.ReadSwitchFunctionStatusRegister());
-                    irqManager.SetInterrupt(Interrupts.BufferReadReady, irqManager.IsEnabled(Interrupts.BufferReadReady));
                     break;
                 case SDCardCommand.SendInterfaceConditionCommand:
                     internalBuffer.EnqueueRange(sdCard.ReadExtendedCardSpecificDataRegister());
-                    irqManager.SetInterrupt(Interrupts.BufferReadReady, irqManager.IsEnabled(Interrupts.BufferReadReady));
                     break;
                 case SDCardCommand.ReadSingleBlock:
-                    ProcessData(sdCard, blockSizeField.Value);
+                    ReadCard(sdCard, blockSizeField.Value);
                     break;
                 case SDCardCommand.ReadMultipleBlocks:
-                    ProcessData(sdCard, blockCountField.Value * blockSizeField.Value);
+                    ReadCard(sdCard, blockCountField.Value * blockSizeField.Value);
+                    break;
+                case SDCardCommand.WriteSingleBlock:
+                    WriteCard(sdCard, blockSizeField.Value);
+                    break;
+                case SDCardCommand.WriteMultipleBlocks:
+                    WriteCard(sdCard, blockCountField.Value * blockSizeField.Value);
                     break;
             }
-            irqManager.SetInterrupt(Interrupts.CommandComplete, irqManager.IsEnabled(Interrupts.CommandComplete));
         }
 
-        private void ProcessData(SDCard sdCard, uint size)
+        private void ReadCard(SDCard sdCard, uint size)
         {
             var data = sdCard.ReadData(size);
             if(isDmaEnabled.Value)
             {
                 Machine.SystemBus.WriteBytes(data, ((ulong)dmaSystemAddressHigh.Value << 32) | dmaSystemAddressLow.Value);
-                irqManager.SetInterrupt(Interrupts.TransferComplete, irqManager.IsEnabled(Interrupts.TransferComplete));
+                Machine.LocalTimeSource.ExecuteInNearestSyncedState(_ =>
+                {
+                    irqManager.SetInterrupt(Interrupts.TransferComplete, irqManager.IsEnabled(Interrupts.TransferComplete));
+                });
             }
             else
             {
                 internalBuffer.EnqueueRange(data);
             }
-            irqManager.SetInterrupt(Interrupts.BufferReadReady, irqManager.IsEnabled(Interrupts.BufferReadReady));
         }
 
-        private void WriteToBuffer(SDCard sdCard, byte[] data)
+        private void WriteBuffer(SDCard sdCard, byte[] data)
         {
             var limit = blockCountField.Value * blockSizeField.Value;
             internalBuffer.EnqueueRange(data);
@@ -390,18 +390,57 @@ namespace Antmicro.Renode.Peripherals.SD
             irqManager.SetInterrupt(Interrupts.TransferComplete, irqManager.IsEnabled(Interrupts.TransferComplete));
         }
 
-        private IValueRegisterField blockSizeField;
-        private IValueRegisterField blockCountField;
+        private void WriteCard(SDCard sdCard, uint size)
+        {
+            var bytes = new byte[size];
+            if(isDmaEnabled.Value)
+            {
+                bytes = Machine.SystemBus.ReadBytes(((ulong)dmaSystemAddressHigh.Value << 32) | dmaSystemAddressLow.Value, (int)size);
+            }
+            else
+            {
+                if(internalBuffer.Count < size)
+                {
+                    this.Log(LogLevel.Warning, "Could not write {0} bytes to SD card, writing {1} bytes instead.", size, internalBuffer.Count);
+                    size = (uint)internalBuffer.Count;
+                }
+                bytes = internalBuffer.DequeueRange((int)size);
+            }
+            sdCard.WriteData(bytes);
+            Machine.LocalTimeSource.ExecuteInNearestSyncedState(_ =>
+            {
+                irqManager.SetInterrupt(Interrupts.TransferComplete, irqManager.IsEnabled(Interrupts.TransferComplete));
+            });
+        }
+
+        private uint ReadBuffer()
+        {
+            var internalBytes = internalBuffer.DequeueRange(4);
+            bytesRead += (uint)internalBytes.Length;
+            irqManager.SetInterrupt(Interrupts.BufferReadReady, irqManager.IsEnabled(Interrupts.BufferReadReady));
+            if(bytesRead == (blockCountField.Value * blockSizeField.Value)|| !internalBuffer.Any())
+            {
+                irqManager.SetInterrupt(Interrupts.TransferComplete, irqManager.IsEnabled(Interrupts.TransferComplete));
+                bytesRead = 0;
+                // If we have read the exact amount of data we wanted, we can clear the buffer from any leftovers.
+                internalBuffer.Clear();
+            }
+            return internalBytes.ToUInt32Smart();
+        }
+
         private IFlagRegisterField ackField;
         private IFlagRegisterField isDmaEnabled;
+        private IValueRegisterField blockSizeField;
+        private IValueRegisterField blockCountField;
         private IValueRegisterField addressField;
-        private IValueRegisterField writeDataField;
-        private IEnumRegisterField<SDCardCommand> commandIndex;
         private IValueRegisterField readDataField;
+        private IValueRegisterField writeDataField;
         private IValueRegisterField dmaSystemAddressLow;
         private IValueRegisterField dmaSystemAddressHigh;
+        private IEnumRegisterField<SDCardCommand> commandIndex;
         private IEnumRegisterField<ResponseType> responseTypeSelectField;
 
+        private uint bytesRead;
         private IPhysicalLayer<byte> phy;
         private Queue<byte> internalBuffer;
 
@@ -473,7 +512,9 @@ namespace Antmicro.Renode.Peripherals.SD
             CheckSwitchableFunction = 6,
             SendInterfaceConditionCommand = 8,
             ReadSingleBlock = 17,
-            ReadMultipleBlocks = 18
+            ReadMultipleBlocks = 18,
+            WriteSingleBlock = 24,
+            WriteMultipleBlocks = 25,
         }
     }
 }

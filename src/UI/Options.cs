@@ -17,7 +17,7 @@ namespace Antmicro.Renode.UI
         [Name('P', "port"), DefaultValue(-1), Description("Instead of opening a window, listen for monitor commands on the specified port.")]
         public int Port { get; set; }
 
-        [Name('e', "execute"), Description("Execute command on startup (this option is exclusive with -s and startup script passed as an argument). May be used many times.")]
+        [Name('e', "execute"), Description("Execute command on startup (this option is exclusive with startup script passed as an argument). May be used many times.")]
         public string[] Execute { get; set; }
 
         [Name("disable-xwt"), DefaultValue(false), Description("Disable XWT GUI support. It automatically sets HideMonitor.")]
@@ -42,6 +42,9 @@ namespace Antmicro.Renode.UI
         public int RobotFrameworkRemoteServerPort { get; set; }
         [Name("robot-debug-on-error"), DefaultValue(false), Description("Initialize GUI for Robot tests debugging")]
         public bool RobotDebug { get; set; }
+
+        [Name('v', "version"), DefaultValue(false), Description("Print version and exit.")]
+        public bool Version { get; set; }
 
         public bool Validate(out string error)
         {
