@@ -729,6 +729,7 @@
     <Compile Include="Emulator/Peripherals/Peripherals/USBDeprecated/IUSBHubBase.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/USBDeprecated/USBPacket.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/CAN/STMCAN.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/CAN/XMC4XXX_CAN.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/CAN/MPFS_CAN.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/CAN/MCAN.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/CAN/MCAN_Structures.cs" />
