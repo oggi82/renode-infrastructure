@@ -55,6 +55,11 @@ namespace Antmicro.Renode.Peripherals.Timers
 
         public GPIO ResetRequest { get; }
 
+        // Number of reset requests and pre-warning alarms since the start of the simulation (not cleared by reset; for tests)
+        public uint ResetRequestCount { get; private set; }
+
+        public uint PreWarningCount { get; private set; }
+
         private void DefineRegisters()
         {
             Registers.Id.Define(this, 0x00ADC000)
@@ -127,6 +132,7 @@ namespace Antmicro.Renode.Peripherals.Timers
             {
                 this.Log(LogLevel.Info, "Pre-warning alarm");
                 alarmStatus = true;
+                PreWarningCount++;
                 Alarm.Set();
                 Alarm.Unset();
                 // the counter restarts for the second crossing (periodic timer wrapped to 0)
@@ -139,6 +145,7 @@ namespace Antmicro.Renode.Peripherals.Timers
         private void RequestSystemReset()
         {
             timer.Enabled = false;
+            ResetRequestCount++;
             ResetRequest.Set();
             ResetRequest.Unset();
         }
