@@ -118,7 +118,7 @@ namespace Antmicro.Renode.Peripherals.Analog
         // Number of triggers (output updates) since the current mode was started
         public ulong GetSampleNumber(uint channel)
         {
-            return GetChannel(channel).SampleNumber;
+            return GetChannel(channel).CurrentSampleNumber;
         }
 
         public uint Output0Code => GetOutputCode(0);
@@ -263,6 +263,15 @@ namespace Antmicro.Renode.Peripherals.Analog
             public Mode CurrentMode => (Mode)((config0 >> 20) & 7);
 
             public uint TriggerMode => (config1 >> 17) & 3;
+
+            public ulong CurrentSampleNumber
+            {
+                get
+                {
+                    Master.Synchronize();
+                    return Master.SampleNumber;
+                }
+            }
 
             public uint TriggerSelect => (config1 >> 12) & 7;
 
