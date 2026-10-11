@@ -629,6 +629,9 @@
     <Compile Include="Emulator/Peripherals/Peripherals/UART/AxiUartLite.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Input/AntMouse.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/MTD/CFIFlashExtensions.cs" />
+    <!-- XMC4500 flash -->
+    <Compile Include="Emulator/Peripherals/Peripherals/MTD/XMC4XXX_FlashController.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/MTD/XMC4XXX_FlashArray.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/MTD/CC2538FlashController.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Input/PS2Keyboard.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Input/PS2Mouse.cs" />
