@@ -945,6 +945,8 @@
     <Compile Include="Emulator/Peripherals/Peripherals/Analog/EOSS3_ADC.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/STM32Series.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Analog/STM32_ADC_Common.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/Analog/XMC4XXX_DAC.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/Analog/XMC4XXX_VADC.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Analog/STM32F0_ADC.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Analog/STM32G0_ADC.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Analog/STM32WBA_ADC.cs" />
