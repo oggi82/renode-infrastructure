@@ -35,6 +35,22 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
 
         public long Size => 0x1000;
 
+        // Clock of the peripherals (USIC baud rate generators): fPERIPH = fCPU / (PBDIV + 1)
+        public uint PeripheralClockFrequency
+        {
+            get
+            {
+                var systemClockControl = RegistersCollection.Read((long)Registers.SystemClockControl);
+                var cpuClockControl = RegistersCollection.Read((long)Registers.CpuClockControl);
+                var peripheralClockControl = RegistersCollection.Read((long)Registers.PeripheralClockControl);
+                var frequency = (systemClockControl & SystemClockSourcePll) != 0 ? GetPllFrequency() : InternalOscillatorFrequency;
+                frequency /= (systemClockControl & 0xFF) + 1;
+                frequency /= (cpuClockControl & 1) + 1;
+                frequency /= (peripheralClockControl & 1) + 1;
+                return frequency;
+            }
+        }
+
         private void DefineRegisters()
         {
             // The hibernate domain is written through a mirror; updates are applied instantly here.

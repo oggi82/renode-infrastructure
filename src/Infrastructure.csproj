@@ -1226,7 +1226,9 @@
     <Compile Include="Emulator/Peripherals/Peripherals/IRQControllers/RenesasRA_ICU.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/UART/BCM2711_AUX_UART.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/UART/NXP_LPUART.cs" />
-    <Compile Include="Emulator/Peripherals/Peripherals/UART/XMC4XXX_UART.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/UART/XMC4XXX_USIC.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/UART/XMC4XXX_USIC_SSC.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/UART/XMC4XXX_USIC_IIC.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/UART/SmartbondUART.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/GPIOPort/RenesasRA_GPIOMisc.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/CAN/CANToUART.cs" />
