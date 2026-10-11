@@ -629,6 +629,9 @@
     <Compile Include="Emulator/Peripherals/Peripherals/UART/AxiUartLite.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Input/AntMouse.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/MTD/CFIFlashExtensions.cs" />
+    <!-- XMC4500 flash -->
+    <Compile Include="Emulator/Peripherals/Peripherals/MTD/XMC4XXX_FlashController.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/MTD/XMC4XXX_FlashArray.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/MTD/CC2538FlashController.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Input/PS2Keyboard.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Input/PS2Mouse.cs" />
@@ -729,6 +732,7 @@
     <Compile Include="Emulator/Peripherals/Peripherals/USBDeprecated/IUSBHubBase.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/USBDeprecated/USBPacket.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/CAN/STMCAN.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/CAN/XMC4XXX_CAN.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/CAN/MPFS_CAN.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/CAN/MCAN.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/CAN/MCAN_Structures.cs" />
@@ -945,6 +949,8 @@
     <Compile Include="Emulator/Peripherals/Peripherals/Analog/EOSS3_ADC.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/STM32Series.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Analog/STM32_ADC_Common.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/Analog/XMC4XXX_DAC.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/Analog/XMC4XXX_VADC.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Analog/STM32F0_ADC.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Analog/STM32G0_ADC.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Analog/STM32WBA_ADC.cs" />
@@ -1101,6 +1107,7 @@
     <Compile Include="Emulator/Peripherals/Peripherals/Miscellaneous/XMC4XXX_SCU.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Timers/XMC4XXX_WDT.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Timers/XMC4XXX_RTC.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/Timers/XMC4XXX_CCU4.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Miscellaneous/ExternalWindowMMU.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Mocks/SimpleDMA.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Video/MusteinGenericGPU.cs" />

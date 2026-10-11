@@ -5,6 +5,8 @@
 // Full license text is available in 'licenses/MIT.txt'.
 //
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using Antmicro.Renode.Core;
 using Antmicro.Renode.Core.Structure.Registers;
@@ -32,13 +34,20 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
     // 4 WDT reset request, 5 RTC hibernate wake-up trigger, 6 hibernate wake-up pin event (rising edge, positive edge event),
     // 7 hibernate wake-up pin event (falling edge), 16-19 ERU0 outputs 0-3 (NMI request promotion).
     [AllowedTranslations(AllowedTranslation.ByteToDoubleWord | AllowedTranslation.WordToDoubleWord)]
-    public sealed class XMC4XXX_SCU : BasicDoubleWordPeripheral, IKnownSize, IGPIOReceiver
+    public sealed class XMC4XXX_SCU : BasicDoubleWordPeripheral, IKnownSize, IGPIOReceiver, INumberedGPIOOutput
     {
         public XMC4XXX_SCU(IMachine machine, NVIC nvic = null, uint oscillatorFrequency = 12000000) : base(machine)
         {
             this.nvic = nvic;
             this.oscillatorFrequency = oscillatorFrequency;
             IRQ = new GPIO();
+            // CCU trigger outputs GSC40-GSC43 / GSC80-GSC81 (CCUCON); Connections are numbered by CCUCON bit
+            var connections = new Dictionary<int, IGPIO>();
+            foreach(var bit in CcuTriggerBits)
+            {
+                connections[bit] = new GPIO();
+            }
+            Connections = new ReadOnlyDictionary<int, IGPIO>(connections);
             ResetPersistentState();
             ResetCoreDomainState();
             DefineRegisters();
@@ -126,6 +135,11 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
 
         public GPIO IRQ { get; }
 
+        public IReadOnlyDictionary<int, IGPIO> Connections { get; }
+
+        // fCCU = fSYS >> CCUDIV (CCUCLKCR), as in XMC_SCU_CLOCK_GetCcuClockFrequency
+        public uint CcuClockFrequency => GetSystemClockFrequency() >> (int)(RegistersCollection.Read((long)Registers.CcuClockControl) & 1);
+
         // Frequency of fWDT in Hz; 0 while the WDT clock is disabled (CLKSTAT.WDTCST = 0)
         public uint WatchdogClockFrequency
         {
@@ -210,11 +224,15 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             Registers.GeneralPurpose1.Define(this)
                 .WithValueField(0, 32, name: "GPR1");
 
+            // CCU trigger signals for the CCU4/CCU8 units: GSC40-43 (bits 0-3) and GSC80-81 (bits 8-9) drive the numbered outputs
             Registers.CcuGlobalStart.Define(this)
-                .WithValueField(0, 4, name: "GSC4x")
-                .WithReservedBits(4, 4)
-                .WithValueField(8, 2, name: "GSC8x")
-                .WithReservedBits(10, 22);
+                .WithValueField(0, 32, name: "CCUCON", writeCallback: (_, value) =>
+                {
+                    foreach(var bit in CcuTriggerBits)
+                    {
+                        Connections[bit].Set((value & (1u << bit)) != 0);
+                    }
+                });
 
             // The hibernate domain, the RTC and the retention memory are written through mirror registers; updates are applied instantly.
             Registers.MirrorStatus.Define(this)
@@ -715,12 +733,16 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                 return;
             }
 
-            var systemClockControl = RegistersCollection.Read((long)Registers.SystemClockControl);
             var cpuClockControl = RegistersCollection.Read((long)Registers.CpuClockControl);
+            nvic.Frequency = GetSystemClockFrequency() / ((cpuClockControl & 1) + 1);
+        }
+
+        // fSYS = (OFI or PLL) / (SYSDIV + 1)
+        private uint GetSystemClockFrequency()
+        {
+            var systemClockControl = RegistersCollection.Read((long)Registers.SystemClockControl);
             var frequency = SystemClockFromPll ? GetSystemPllFrequency() : InternalOscillatorFrequency;
-            frequency /= (systemClockControl & 0xFF) + 1;
-            frequency /= (cpuClockControl & 1) + 1;
-            nvic.Frequency = frequency;
+            return frequency / ((systemClockControl & 0xFF) + 1);
         }
 
         // Same formulas as SystemCoreClockUpdate of the XMC library: fPLL = fIN * (NDIV + 1) / ((PDIV + 1) * (K2DIV + 1)) in normal mode,
@@ -800,6 +822,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         private const int PeripheralResetRegisterCount = 4;
         private const int SetClearGroupStride = 12;
         private const int NmiException = 2;
+        private static readonly int[] CcuTriggerBits = { 0, 1, 2, 3, 8, 9 };
 
         private const uint ResetCausePowerOn = 0x01;
         private const uint ResetCauseWatchdog = 0x20;
