@@ -4,6 +4,8 @@
 // This file is licensed under the MIT License.
 // Full license text is available in 'licenses/MIT.txt'.
 //
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using Antmicro.Renode.Core;
 using Antmicro.Renode.Core.Structure.Registers;
 using Antmicro.Renode.Peripherals.Bus;
@@ -18,12 +20,19 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
     // updates asynchronously (PLL lock, oscillator watchdog, hibernate mirror update) are
     // reflected immediately. Interrupts, parity, trap and the remaining SCU blocks are not modeled.
     [AllowedTranslations(AllowedTranslation.ByteToDoubleWord | AllowedTranslation.WordToDoubleWord)]
-    public sealed class XMC4XXX_SCU : BasicDoubleWordPeripheral, IKnownSize
+    public sealed class XMC4XXX_SCU : BasicDoubleWordPeripheral, IKnownSize, INumberedGPIOOutput
     {
         public XMC4XXX_SCU(IMachine machine, NVIC nvic = null, uint oscillatorFrequency = 12000000) : base(machine)
         {
             this.nvic = nvic;
             this.oscillatorFrequency = oscillatorFrequency;
+            // CCU trigger outputs GSC40-GSC43 / GSC80-GSC81 (CCUCON), Connections are numbered by CCUCON bit
+            var connections = new Dictionary<int, IGPIO>();
+            foreach(var bit in CcuTriggerBits)
+            {
+                connections[bit] = new GPIO();
+            }
+            Connections = new ReadOnlyDictionary<int, IGPIO>(connections);
             DefineRegisters();
         }
 
@@ -36,23 +45,26 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         public long Size => 0x1000;
 
         // Clock of the peripherals (USIC baud rate generators): fPERIPH = fCPU / (PBDIV + 1)
-        public uint PeripheralClockFrequency
-        {
-            get
-            {
-                var systemClockControl = RegistersCollection.Read((long)Registers.SystemClockControl);
-                var cpuClockControl = RegistersCollection.Read((long)Registers.CpuClockControl);
-                var peripheralClockControl = RegistersCollection.Read((long)Registers.PeripheralClockControl);
-                var frequency = (systemClockControl & SystemClockSourcePll) != 0 ? GetPllFrequency() : InternalOscillatorFrequency;
-                frequency /= (systemClockControl & 0xFF) + 1;
-                frequency /= (cpuClockControl & 1) + 1;
-                frequency /= (peripheralClockControl & 1) + 1;
-                return frequency;
-            }
-        }
+        public uint PeripheralClockFrequency => GetSystemClockFrequency() / ((RegistersCollection.Read((long)Registers.CpuClockControl) & 1) + 1)
+            / ((RegistersCollection.Read((long)Registers.PeripheralClockControl) & 1) + 1);
+
+        public IReadOnlyDictionary<int, IGPIO> Connections { get; }
+
+        // fCCU = fSYS >> CCUDIV (CCUCLKCR), as in XMC_SCU_CLOCK_GetCcuClockFrequency
+        public uint CcuClockFrequency => GetSystemClockFrequency() >> (int)(RegistersCollection.Read((long)Registers.CcuClockControl) & 1);
 
         private void DefineRegisters()
         {
+            // CCU trigger signals for the CCU4/CCU8 units (CCUCON of SCU_GENERAL)
+            Registers.CcuControl.Define(this)
+                .WithValueField(0, 32, name: "CCUCON", writeCallback: (_, value) =>
+                {
+                    foreach(var bit in CcuTriggerBits)
+                    {
+                        Connections[bit].Set((value & (1u << bit)) != 0);
+                    }
+                });
+
             // The hibernate domain is written through a mirror; updates are applied instantly here.
             Registers.MirrorStatus.Define(this)
                 .WithValueField(0, 32, FieldMode.Read, valueProviderCallback: _ => 0, name: "MIRRSTS");
@@ -162,12 +174,16 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                 return;
             }
 
-            var systemClockControl = RegistersCollection.Read((long)Registers.SystemClockControl);
             var cpuClockControl = RegistersCollection.Read((long)Registers.CpuClockControl);
+            nvic.Frequency = GetSystemClockFrequency() / ((cpuClockControl & 1) + 1);
+        }
+
+        // fSYS = (OFI or PLL) / (SYSDIV + 1)
+        private uint GetSystemClockFrequency()
+        {
+            var systemClockControl = RegistersCollection.Read((long)Registers.SystemClockControl);
             var frequency = (systemClockControl & SystemClockSourcePll) != 0 ? GetPllFrequency() : InternalOscillatorFrequency;
-            frequency /= (systemClockControl & 0xFF) + 1;
-            frequency /= (cpuClockControl & 1) + 1;
-            nvic.Frequency = frequency;
+            return frequency / ((systemClockControl & 0xFF) + 1);
         }
 
         // Same formulas as SystemCoreClockUpdate of the XMC library: fPLL = fIN * (NDIV + 1) / ((PDIV + 1) * (K2DIV + 1)) when locked, fIN / (K1DIV + 1) otherwise
@@ -197,12 +213,15 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
 
         private const uint InternalOscillatorFrequency = 24000000;
         private const uint SystemClockSourcePll = 1u << 16;
+        private static readonly int[] CcuTriggerBits = { 0, 1, 2, 3, 8, 9 };
         private const int PeripheralResetRegisterCount = 4;
         private const int ClockGatingRegisterCount = 3;
         private const int SetClearGroupStride = 12;
 
         private enum Registers : long
         {
+            CcuControl = 0x04C,
+
             MirrorStatus = 0x0C4,
 
             PowerStatus = 0x200,
