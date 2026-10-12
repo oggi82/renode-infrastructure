@@ -516,15 +516,28 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
 
             DefineSystemPll();
 
+            // USB PLL (RM 10.x): status is derived from the control bits, lock is immediate when powered
             Registers.UsbPllStatus.Define(this, 0x2)
-                .WithValueField(0, 32, FieldMode.Read, name: "USBPLLSTAT");
+                .WithFlag(0, FieldMode.Read, name: "VCOBYST", valueProviderCallback: _ => usbPllBypass.Value)
+                .WithFlag(1, FieldMode.Read, name: "PWDSTAT", valueProviderCallback: _ => usbPllVcoPowerDown.Value)
+                .WithFlag(2, FieldMode.Read, name: "VCOLOCK", valueProviderCallback: _ => !usbPllVcoPowerDown.Value && !usbPllPowerDown.Value)
+                .WithReservedBits(3, 3)
+                .WithFlag(6, FieldMode.Read, name: "BY", valueProviderCallback: _ => usbPllBypass.Value)
+                .WithFlag(7, FieldMode.Read, name: "VCOLOCKED", valueProviderCallback: _ => !usbPllVcoPowerDown.Value && !usbPllPowerDown.Value)
+                .WithReservedBits(8, 24);
             Registers.UsbPllControl.Define(this, 0x00010003)
-                .WithValueField(0, 32, name: "USBPLLCON");
+                .WithFlag(0, out usbPllBypass, name: "VCOBYP")
+                .WithFlag(1, out usbPllVcoPowerDown, name: "VCOPWD")
+                .WithValueField(2, 14, name: "USBPLLCON_MID")
+                .WithFlag(16, out usbPllPowerDown, name: "PLLPWD")
+                .WithValueField(17, 15, name: "USBPLLCON_HIGH");
 
             Registers.ClockMultiplexingStatus.Define(this)
                 .WithValueField(0, 2, FieldMode.Read, name: "SYSCLKMUX", valueProviderCallback: _ => SystemClockFromPll ? 2u : 1u)
                 .WithReservedBits(2, 30);
         }
+
+        private IFlagRegisterField usbPllBypass, usbPllVcoPowerDown, usbPllPowerDown;
 
         private void DefineSystemPll()
         {
