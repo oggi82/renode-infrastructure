@@ -721,8 +721,9 @@ namespace Antmicro.Renode.Peripherals.Timers
                     return;
                 }
                 SetStatus(true);
-                // TC.CAPC: 1 clears the timer on a capture into CV1/CV0, 2 on a capture into CV3/CV2, 3 on any capture
-                if((((TimerControl >> 5) & 3) & clearMask) != 0)
+                // TC.CAPC: 1 clears the timer on a capture into CV3/CV2, 2 on a capture into CV1/CV0, 3 on any capture
+                var clearMode = (TimerControl >> 5) & 3;
+                if(((clearMode & 2) != 0 && (clearMask & 1) != 0) || ((clearMode & 1) != 0 && (clearMask & 2) != 0))
                 {
                     ClearTimer();
                 }
