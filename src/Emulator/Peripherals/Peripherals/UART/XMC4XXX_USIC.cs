@@ -29,6 +29,7 @@ namespace Antmicro.Renode.Peripherals.UART
     //
     // ASC is timed: a frame needs start + data + parity + stop bits at the baud rate derived from
     // FDR, BRG and the peripheral clock of the SCU. SSC and IIC transfers are performed at once.
+    [AllowedTranslations(AllowedTranslation.ByteToDoubleWord | AllowedTranslation.WordToDoubleWord)]
     public partial class XMC4XXX_USIC : UARTBase, IDoubleWordPeripheral, IProvidesRegisterCollection<DoubleWordRegisterCollection>, IKnownSize, INumberedGPIOOutput, IGPIOReceiver,
         IPeripheralContainer<ISPIPeripheral, NumberRegistrationPoint<int>>, IPeripheralContainer<II2CPeripheral, NumberRegistrationPoint<int>>
     {
@@ -114,7 +115,12 @@ namespace Antmicro.Renode.Peripherals.UART
 
         // The channel whose pins are wired to this channel: ASC data goes to the peer's receiver, an SSC master
         // shifts words through the peer (SSC slave), an IIC master addresses the peer as slave.
-        public XMC4XXX_USIC Peer { get; set; }
+        public XMC4XXX_USIC Peer { get; private set; }
+
+        public void ConnectPeer(XMC4XXX_USIC peer)
+        {
+            Peer = peer;
+        }
 
         public override Bits StopBits => (pcr.Value & 2) != 0 ? Bits.Two : Bits.One;
 

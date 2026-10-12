@@ -142,6 +142,7 @@ namespace Antmicro.Renode.Peripherals.UART
 
         private uint SscExchange(uint word, int bits, int selected, bool startOfFrame)
         {
+            this.Log(LogLevel.Debug, "SSC word 0x{0:X} ({1} bits), selected 0x{2:X}, peer {3}", word, bits, selected, Peer == null ? "none" : "set");
             if(Peer != null && Peer != this)
             {
                 if(startOfFrame)
