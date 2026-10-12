@@ -19,6 +19,7 @@ namespace Antmicro.Renode.Peripherals.UART
     // the host immediately and the transmit indication flags (TSIF, TBIF) are set at once.
     // The six service request lines of a USIC module are exposed as Connections 0-5 and selected per event with INPR.
     // The baud rate is derived from FDR and BRG assuming the given peripheral clock frequency.
+    [AllowedTranslations(AllowedTranslation.ByteToDoubleWord | AllowedTranslation.WordToDoubleWord)]
     public class XMC4XXX_UART : UARTBase, IDoubleWordPeripheral, IProvidesRegisterCollection<DoubleWordRegisterCollection>, IKnownSize, INumberedGPIOOutput
     {
         public XMC4XXX_UART(IMachine machine, uint peripheralClockFrequency = 120000000) : base(machine)
