@@ -661,6 +661,8 @@
     <Compile Include="Emulator/Peripherals/Peripherals/DMA/STM32LDMA.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Miscellaneous/ArmSysCtl.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/DMA/OmapDma.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/DMA/XMC4XXX_DLR.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/DMA/XMC4XXX_GPDMA.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/EfmSystemDevice.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/UART/GaislerAPBUART.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/UART/Infineon_SCBUART.cs" />
@@ -1171,6 +1173,7 @@
     <Compile Include="Emulator/Peripherals/Peripherals/I3C/Caliptra_I3C.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/I3C/Caliptra_I3C_generated.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/CRC/STM32_CRC.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/CRC/XMC4XXX_FCE.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/MTD/STM32L0_FlashController.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/MTD/STM32_FlashController.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/MTD/STM32H7_FlashController.cs" />
