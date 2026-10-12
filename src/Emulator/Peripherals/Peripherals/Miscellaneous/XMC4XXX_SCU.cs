@@ -135,6 +135,10 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
 
         public GPIO IRQ { get; }
 
+        // Clock of the peripherals (USIC baud rate generators): fPERIPH = fCPU / (PBDIV + 1)
+        public uint PeripheralClockFrequency => GetSystemClockFrequency() / ((RegistersCollection.Read((long)Registers.CpuClockControl) & 1) + 1)
+            / ((RegistersCollection.Read((long)Registers.PeripheralBusClockControl) & 1) + 1);
+
         public IReadOnlyDictionary<int, IGPIO> Connections { get; }
 
         // fCCU = fSYS >> CCUDIV (CCUCLKCR), as in XMC_SCU_CLOCK_GetCcuClockFrequency

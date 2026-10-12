@@ -1110,6 +1110,7 @@
     <Compile Include="Emulator/Peripherals/Peripherals/Timers/XMC4XXX_WDT.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Timers/XMC4XXX_RTC.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Timers/XMC4XXX_CCU4.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/Miscellaneous/XMC4XXX_POSIF.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Timers/XMC4XXX_CCU8.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Miscellaneous/XMC4XXX_ERU.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Miscellaneous/ExternalWindowMMU.cs" />
@@ -1240,7 +1241,9 @@
     <Compile Include="Emulator/Peripherals/Peripherals/IRQControllers/RenesasRA_ICU.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/UART/BCM2711_AUX_UART.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/UART/NXP_LPUART.cs" />
-    <Compile Include="Emulator/Peripherals/Peripherals/UART/XMC4XXX_UART.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/UART/XMC4XXX_USIC.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/UART/XMC4XXX_USIC_SSC.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/UART/XMC4XXX_USIC_IIC.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/UART/SmartbondUART.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/GPIOPort/RenesasRA_GPIOMisc.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/CAN/CANToUART.cs" />
