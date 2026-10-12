@@ -122,15 +122,23 @@ namespace Antmicro.Renode.Peripherals.UART
                 sscFrameBits = 0;
                 RaiseProtocolEvent(1u << 2, (pcr.Value & 1u << 14) != 0);
             }
-            ConsumeTransmitBuffer();
-            RaiseReceiveStart();
-
-            // The word is shifted at fSCLK = fPDIV / 2; the exchange and the receive events happen at its end
+            // The word is shifted at fSCLK = fPDIV / 2; the exchange and the receive events happen at its end.
+            // TBUF is handed over to the shift register one SCLK period after the start (so a burst of words written by a DMA
+            // right after the first one still finds that one in TBUF and the FIFO level reaches the limit, as on the hardware).
             sscBusy = true;
             var current = generation;
             var sclk = ProtocolDividerFrequency() / 2;
-            var seconds = bits / (sclk > 0 ? sclk : 1000000.0);
-            machine.ScheduleAction(TimeInterval.FromSeconds(seconds), _ => SscWordDone(current, word, bits, selected, startOfFrame, endOfFrame), name: "XMC4XXX_USIC shift");
+            var period = 1 / (sclk > 0 ? sclk : 1000000.0);
+            var seconds = bits * period;
+            machine.ScheduleAction(TimeInterval.FromSeconds(4 * period), _ =>
+            {
+                if(current == generation)
+                {
+                    ConsumeTransmitBuffer();
+                    RaiseReceiveStart();
+                }
+            }, name: "XMC4XXX_USIC shift start");
+            machine.ScheduleAction(TimeInterval.FromSeconds(4 * period + seconds), _ => SscWordDone(current, word, bits, selected, startOfFrame, endOfFrame), name: "XMC4XXX_USIC shift");
             return true;
         }
 
