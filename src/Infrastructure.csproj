@@ -1108,6 +1108,7 @@
     <Compile Include="Emulator/Peripherals/Peripherals/Timers/XMC4XXX_WDT.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Timers/XMC4XXX_RTC.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Timers/XMC4XXX_CCU4.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/Miscellaneous/XMC4XXX_ERU.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Miscellaneous/ExternalWindowMMU.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Mocks/SimpleDMA.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/Video/MusteinGenericGPU.cs" />
