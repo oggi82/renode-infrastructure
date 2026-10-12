@@ -662,6 +662,7 @@
     <Compile Include="Emulator/Peripherals/Peripherals/Miscellaneous/ArmSysCtl.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/DMA/OmapDma.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/DMA/XMC4XXX_DLR.cs" />
+    <Compile Include="Emulator/Peripherals/Peripherals/Mocks/SpiLoopbackDevice.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/DMA/XMC4XXX_GPDMA.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/EfmSystemDevice.cs" />
     <Compile Include="Emulator/Peripherals/Peripherals/UART/GaislerAPBUART.cs" />
