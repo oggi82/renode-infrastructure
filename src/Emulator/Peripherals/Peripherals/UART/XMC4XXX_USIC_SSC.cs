@@ -7,6 +7,7 @@
 using System.Collections.Generic;
 
 using Antmicro.Renode.Logging;
+using Antmicro.Renode.Time;
 
 namespace Antmicro.Renode.Peripherals.UART
 {
@@ -104,6 +105,10 @@ namespace Antmicro.Renode.Peripherals.UART
                     SscEndFrame(selected);
                 }
             }
+            if(sscBusy)
+            {
+                return false;
+            }
             var bits = (int)wordLengthField.Value + 1;
             var mask = (1u << bits) - 1;
             var word = tbufData & mask;
@@ -120,7 +125,22 @@ namespace Antmicro.Renode.Peripherals.UART
             ConsumeTransmitBuffer();
             RaiseReceiveStart();
 
-            var answer = SscExchange(word, bits, selected, startOfFrame) & mask;
+            // The word is shifted at fSCLK = fPDIV / 2; the exchange and the receive events happen at its end
+            sscBusy = true;
+            var current = generation;
+            var sclk = ProtocolDividerFrequency() / 2;
+            var seconds = bits / (sclk > 0 ? sclk : 1000000.0);
+            machine.ScheduleAction(TimeInterval.FromSeconds(seconds), _ => SscWordDone(current, word, bits, selected, startOfFrame, endOfFrame), name: "XMC4XXX_USIC shift");
+            return true;
+        }
+
+        private void SscWordDone(int expectedGeneration, uint word, int bits, int selected, bool startOfFrame, bool endOfFrame)
+        {
+            if(expectedGeneration != generation)
+            {
+                return;
+            }
+            var answer = SscExchange(word, bits, selected, startOfFrame) & ((1u << bits) - 1);
             sscFrameBits += bits;
 
             RaiseTransmitShift();
@@ -137,7 +157,8 @@ namespace Antmicro.Renode.Peripherals.UART
             {
                 SscEndFrame(selected);
             }
-            return true;
+            sscBusy = false;
+            Pump();
         }
 
         private uint SscExchange(uint word, int bits, int selected, bool startOfFrame)
@@ -223,6 +244,7 @@ namespace Antmicro.Renode.Peripherals.UART
             }
         }
 
+        private bool sscBusy;
         private bool sscFrameActive;
         private int sscFrameBits;
         private bool sscSlaveStart = true;

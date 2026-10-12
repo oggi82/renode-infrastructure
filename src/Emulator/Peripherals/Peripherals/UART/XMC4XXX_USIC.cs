@@ -958,7 +958,8 @@ namespace Antmicro.Renode.Peripherals.UART
 
         // ---------------------------------------------------------------- ASC (UART)
 
-        private double AscBaudRate()
+        // fPDIV: fractional divider output divided by PDIV + 1 (and by 2 for PPPEN); 0 if the divider is off
+        private double ProtocolDividerFrequency()
         {
             var peripheralClock = scu != null ? scu.PeripheralClockFrequency : peripheralClockFrequency;
             double frequency;
@@ -977,8 +978,12 @@ namespace Antmicro.Renode.Peripherals.UART
             {
                 frequency /= 2;
             }
-            frequency /= brgPdiv.Value + 1;
-            return frequency / ((brgPctq.Value + 1) * (brgDctq.Value + 1));
+            return frequency / (brgPdiv.Value + 1);
+        }
+
+        private double AscBaudRate()
+        {
+            return ProtocolDividerFrequency() / ((brgPctq.Value + 1) * (brgDctq.Value + 1));
         }
 
         private double AscFrameSeconds()
@@ -998,7 +1003,7 @@ namespace Antmicro.Renode.Peripherals.UART
             ascTxBusy = true;
             var current = generation;
             machine.ScheduleAction(TimeInterval.FromSeconds(AscFrameSeconds()), _ => AscTransmissionDone(current, data), name: "XMC4XXX_USIC transmit");
-            return false;
+            return true;
         }
 
         private void AscTransmissionDone(int expectedGeneration, byte data)

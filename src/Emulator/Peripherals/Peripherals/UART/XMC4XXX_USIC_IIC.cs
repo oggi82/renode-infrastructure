@@ -81,6 +81,7 @@ namespace Antmicro.Renode.Peripherals.UART
 
         private void ResetProtocolState()
         {
+            sscBusy = false;
             sscFrameActive = false;
             sscFrameBits = 0;
             sscSlaveStart = true;
