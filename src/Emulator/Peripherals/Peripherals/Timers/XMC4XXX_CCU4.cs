@@ -23,12 +23,16 @@ namespace Antmicro.Renode.Peripherals.Timers
     // normal prescaler (fTCLK = fCCU / 2^PSIV), run/idle control (GIDLS/GIDLC, prescaler run bit), interrupt flags and the
     // four service request lines, the status bit (ST) and the slice output (OUT = ST xor passive level), the input selector
     // with the external functions start, stop, count and gating, and the timer concatenation of adjacent slices.
-    // Not modeled: capture mode, external load / up-down / trap / modulation / status override, dither, floating prescaler
+    // Capture mode (CMC.CAP0S / CAP1S, capture registers CV0-CV3 with full flags, FIFO-less scheme, same-event scheme, timer
+    // clear on capture) and the external up/down function (CMC.UDS) of an externally counted slice are modeled for the POSIF examples.
+    // Not modeled: external load / trap / modulation / status override, dither, floating prescaler
     // (the registers are stored), input low pass filters and the one-cycle delays of ST and the service request pulses.
     //
     // Connections: 0-3 = service request lines SR0-SR3 (a one-event pulse each), 4-7 = slice outputs OUT0-OUT3.
     // Inputs (OnGPIO): number 0-15 is the input letter A-P (CCU4x.INyA-P) shared by all slices of the unit; 12-15 are always
     // the status bits ST0-ST3 of the unit itself, 8 is the SCU trigger GSC4x, the others are free for a test to drive.
+    // Numbers 16-79 address one input of one slice only (16 + 16 * slice + letter), they are or-ed with the unit wide input.
+    // This is how the POSIF outputs are wired, the device routes them to different letters for different slices.
     public sealed class XMC4XXX_CCU4 : BasicDoubleWordPeripheral, IKnownSize, INumberedGPIOOutput, IGPIOReceiver
     {
         public XMC4XXX_CCU4(IMachine machine, XMC4XXX_SCU scu = null, uint clockFrequency = 120000000) : base(machine)
@@ -69,6 +73,11 @@ namespace Antmicro.Renode.Peripherals.Timers
 
         public void OnGPIO(int number, bool value)
         {
+            if(number >= InputCount && number < InputCount * (SliceCount + 1))
+            {
+                slices[(number - InputCount) / InputCount].SetOwnInput((number - InputCount) % InputCount, value);
+                return;
+            }
             if(number < 0 || number >= InputCount)
             {
                 this.Log(LogLevel.Warning, "Input {0} does not exist", number);
@@ -180,8 +189,8 @@ namespace Antmicro.Renode.Peripherals.Timers
                 .WithFlag(2, FieldMode.Write, name: "DITC")
                 .WithReservedBits(3, 29);
 
-            // CMOD (bit 3) is set by hardware only in capture mode, which is not modeled
-            defineReadWrite(SliceRegisters.TimerControl, "TC", () => s.TimerControl, v => s.SetTimerControl(v), 0x03E3FF77);
+            // CMOD (bit 3) is set by hardware in capture mode
+            defineReadWrite(SliceRegisters.TimerControl, "TC", () => s.TimerControl | (s.CaptureMode ? 8u : 0u), v => s.SetTimerControl(v), 0x03E3FF77);
             defineReadWrite(SliceRegisters.PassiveLevel, "PSL", () => s.PassiveLevel ? 1u : 0u, v => s.PassiveLevelShadow = (v & 1) != 0, 1);
             defineReadWrite(SliceRegisters.Dither, "DIT", () => s.Dither, v => { }, 0);
             defineReadWrite(SliceRegisters.DitherShadow, "DITS", () => s.DitherShadow, v => s.DitherShadow = v, 0xF);
@@ -195,8 +204,14 @@ namespace Antmicro.Renode.Peripherals.Timers
             defineReadWrite(SliceRegisters.Timer, "TIMER", () => s.TimerValue, v => s.WriteTimerValue(v), 0xFFFF);
             for(var i = 0; i < 4; i++)
             {
+                var register = i;
                 ((Registers)(baseOffset + (long)SliceRegisters.Capture0 + 4 * i)).Define(this)
-                    .WithValueField(0, 32, FieldMode.Read, name: $"CV{i}");
+                    .WithValueField(0, 16, FieldMode.Read, name: $"CAPTV{i}",
+                        valueProviderCallback: _ => s.CaptureValues[register],
+                        readCallback: (_, __) => s.CaptureFull[register] = false)
+                    .WithValueField(16, 4, FieldMode.Read, name: $"FPCV{i}")
+                    .WithFlag(20, FieldMode.Read, name: $"FFL{i}", valueProviderCallback: _ => s.CaptureFull[register])
+                    .WithReservedBits(21, 11);
             }
 
             ((Registers)(baseOffset + (long)SliceRegisters.InterruptStatus)).Define(this)
@@ -355,6 +370,9 @@ namespace Antmicro.Renode.Peripherals.Timers
                 CountingDown = false;
                 Status = false;
                 position = 0;
+                Array.Clear(CaptureValues, 0, CaptureValues.Length);
+                Array.Clear(CaptureFull, 0, CaptureFull.Length);
+                Array.Clear(ownInputs, 0, ownInputs.Length);
             }
 
             public int Index { get; }
@@ -379,6 +397,25 @@ namespace Antmicro.Renode.Peripherals.Timers
             public bool RunBit { get; private set; }
             public bool CountingDown { get; private set; }
             public bool Status { get; private set; }
+            public bool CaptureMode => (connectionMatrix & 0xF0) != 0;
+            public uint[] CaptureValues { get; } = new uint[4];
+            public bool[] CaptureFull { get; } = new bool[4];
+
+            // Input of this slice alone (see the class comment), edges are delivered like those of the unit wide inputs
+            public void SetOwnInput(int letter, bool value)
+            {
+                if(ownInputs[letter] == value)
+                {
+                    return;
+                }
+                var before = ownInputs[letter] || unit.inputLevels[letter];
+                ownInputs[letter] = value;
+                var after = value || unit.inputLevels[letter];
+                if(before != after)
+                {
+                    OnInputChanged(letter, after);
+                }
+            }
 
             public uint ConnectionMatrix
             {
@@ -567,6 +604,18 @@ namespace Antmicro.Renode.Peripherals.Timers
                     return;
                 }
 
+                // external up/down function: the timer counts down while the selected event is active
+                var directionEvent = (connectionMatrix >> 10) & 3;
+                if(directionEvent != 0)
+                {
+                    CountingDown = EventLevel((int)directionEvent - 1);
+                    if(CountingDown)
+                    {
+                        position = position == 0 ? EffectivePeriod : position - 1;
+                        return;
+                    }
+                }
+
                 position++;
                 var count = FillEvents();
                 Span<EventKind> matched = stackalloc EventKind[eventKindCount];
@@ -589,6 +638,10 @@ namespace Antmicro.Renode.Peripherals.Timers
                 SetFlag(Event0Detected << e);
 
                 var selector = (uint)(e + 1);
+                if(CaptureMode)
+                {
+                    Capture(selector);
+                }
                 if((connectionMatrix & 3) == selector)
                 {
                     // external start: STRM = 1 clears the timer first
@@ -614,6 +667,82 @@ namespace Antmicro.Renode.Peripherals.Timers
                 {
                     CountPulse();
                 }
+            }
+
+            // Capture trigger: CAP0S fills CV1 (the old CV1 moves to CV0), CAP1S fills CV3 (old CV3 to CV2),
+            // with TC.SCE one trigger (CAP1S) shifts through all four registers. A full register chain blocks the capture unless TC.CCS is set.
+            private void Capture(uint selector)
+            {
+                var captureLow = ((connectionMatrix >> 4) & 3) == selector;
+                var captureHigh = ((connectionMatrix >> 6) & 3) == selector;
+                var sameEvent = (TimerControl & (1u << 11)) != 0;
+                var ignoreFull = (TimerControl & (1u << 12)) != 0;
+                var value = TimerValue;
+                var captured = false;
+                var clearMask = 0u;
+
+                if(sameEvent)
+                {
+                    if(captureHigh)
+                    {
+                        if(ignoreFull || !(CaptureFull[3] && CaptureFull[2] && CaptureFull[1] && CaptureFull[0]))
+                        {
+                            for(var i = 0; i < 3; i++)
+                            {
+                                if(ignoreFull || (CaptureFull[i + 1] && !CaptureFull[i]))
+                                {
+                                    CaptureValues[i] = CaptureValues[i + 1];
+                                    CaptureFull[i] = CaptureFull[i + 1] || ignoreFull;
+                                }
+                            }
+                            CaptureValues[3] = value;
+                            CaptureFull[3] = true;
+                            captured = true;
+                            clearMask = 3;
+                        }
+                    }
+                }
+                else
+                {
+                    if(captureLow && CaptureInto(0, value, ignoreFull))
+                    {
+                        captured = true;
+                        clearMask |= 1;
+                    }
+                    if(captureHigh && CaptureInto(2, value, ignoreFull))
+                    {
+                        captured = true;
+                        clearMask |= 2;
+                    }
+                }
+
+                if(!captured)
+                {
+                    return;
+                }
+                SetStatus(true);
+                // TC.CAPC: 1 clears the timer on a capture into CV1/CV0, 2 on a capture into CV3/CV2, 3 on any capture
+                if((((TimerControl >> 5) & 3) & clearMask) != 0)
+                {
+                    ClearTimer();
+                }
+            }
+
+            private bool CaptureInto(int low, uint value, bool ignoreFull)
+            {
+                var high = low + 1;
+                if(!ignoreFull && CaptureFull[high] && CaptureFull[low])
+                {
+                    return false;
+                }
+                if(ignoreFull || (CaptureFull[high] && !CaptureFull[low]))
+                {
+                    CaptureValues[low] = CaptureValues[high];
+                    CaptureFull[low] = true;
+                }
+                CaptureValues[high] = value;
+                CaptureFull[high] = true;
+                return true;
             }
 
             private void OnTimerEvent(EventKind kind)
@@ -661,7 +790,7 @@ namespace Antmicro.Renode.Peripherals.Timers
                     SetFlag(PeriodMatchUp);
                 }
 
-                var alwaysActive = Compare == 0;
+                var alwaysActive = Compare == 0 && !CaptureMode;
                 if(alwaysActive)
                 {
                     SetFlag(CenterAligned ? CompareMatchDown : CompareMatchUp);
@@ -801,11 +930,11 @@ namespace Antmicro.Renode.Peripherals.Timers
             private int FillEvents()
             {
                 var count = 0;
-                var period = Period;
+                var period = EffectivePeriod;
                 var compare = Compare;
                 if(!CenterAligned)
                 {
-                    if(compare >= 1 && compare <= period)
+                    if(!CaptureMode && compare >= 1 && compare <= period)
                     {
                         Add(ref count, EventKind.CompareUp, compare);
                     }
@@ -842,18 +971,20 @@ namespace Antmicro.Renode.Peripherals.Timers
 
             private bool EventLevel(int e)
             {
-                var level = unit.inputLevels[EventInput(e)];
+                var level = unit.inputLevels[EventInput(e)] || ownInputs[EventInput(e)];
                 var activeLow = ((InputSelector >> (22 + e)) & 1) != 0;
                 return level ^ activeLow;
             }
 
-            private bool CenterAligned => (TimerControl & 1) != 0 && !Concatenated;
+            private bool CenterAligned => (TimerControl & 1) != 0 && !Concatenated && !CaptureMode;
+            // with a second capture event (CAP1S) the period register holds capture data, the timer then counts the full 16 bit range
+            private uint EffectivePeriod => ((connectionMatrix >> 6) & 3) != 0 ? 0xFFFFu : Period;
             private bool SingleShot => (TimerControl & 2) != 0;
             private bool ClearTriggersShadowTransfer => (TimerControl & 4) != 0;
             private bool Concatenated => Index > 0 && (connectionMatrix & (1u << 20)) != 0;
             private bool ExternallyClocked => Concatenated || ((connectionMatrix >> 14) & 3) != 0;
             private int Divider => 1 << (int)(PrescalerControl & 0xF);
-            private long CycleLength => CenterAligned ? 2 * (long)Period + 2 : (long)Period + 1;
+            private long CycleLength => CenterAligned ? 2 * (long)Period + 2 : (long)EffectivePeriod + 1;
 
             private bool Active
             {
@@ -869,6 +1000,7 @@ namespace Antmicro.Renode.Peripherals.Timers
             }
 
             private uint connectionMatrix;
+            private readonly bool[] ownInputs = new bool[InputCount];
             private uint position;
             private bool timersRunning;
             private long activeLength = 1;
