@@ -554,9 +554,9 @@ namespace Antmicro.Renode.Peripherals.Timers
                 for(var i = 0; i < count; i++)
                 {
                     var timer = timers[(int)eventKinds[i]];
-                    if(timer.Frequency != frequency)
+                    if(timer.Frequency != (ulong)frequency)
                     {
-                        timer.Frequency = frequency;
+                        timer.Frequency = (ulong)frequency;
                     }
                     // The timers run at fCCU; one timer clock cycle (prescaled) is `divider` of these ticks
                     var distance = (long)eventPositions[i] - position;

@@ -65,7 +65,7 @@ namespace Antmicro.Renode.Peripherals.DMA
             softRequestSource = new uint[3];
             softRequestDestination = new uint[3];
 
-            engineTimer = new LimitTimer(machine.ClockSource, transferFrequency, this, "engine", limit: 1, workMode: WorkMode.Periodic, eventEnabled: true);
+            engineTimer = new LimitTimer(machine.ClockSource, (ulong)transferFrequency, this, "engine", limit: 1, workMode: WorkMode.Periodic, eventEnabled: true);
             engineTimer.LimitReached += Step;
 
             DefineRegisters();

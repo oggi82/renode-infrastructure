@@ -643,9 +643,9 @@ namespace Antmicro.Renode.Peripherals.Timers
                 for(var i = 0; i < count; i++)
                 {
                     var timer = timers[(int)eventKinds[i]];
-                    if(timer.Frequency != frequency)
+                    if(timer.Frequency != (ulong)frequency)
                     {
-                        timer.Frequency = frequency;
+                        timer.Frequency = (ulong)frequency;
                     }
                     // The timers run at fCCU; one timer clock cycle (prescaled) is `divider` of these ticks
                     var distance = (long)eventPositions[i] - position;
@@ -783,9 +783,9 @@ namespace Antmicro.Renode.Peripherals.Timers
                 var ticks = (ulong)delay * (1UL << (int)((DeadTimeControl >> 6) & 3)) * (ulong)Divider;
                 var timer = deadTimeTimers[delayedGate];
                 var frequency = unit.ClockFrequency;
-                if(timer.Frequency != frequency)
+                if(timer.Frequency != (ulong)frequency)
                 {
-                    timer.Frequency = frequency;
+                    timer.Frequency = (ulong)frequency;
                 }
                 timer.Value = 0;
                 timer.Limit = ticks;
