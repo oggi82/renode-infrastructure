@@ -42,7 +42,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             UpdateCpuClock();
         }
 
-        public long Size => 0x1000;
+        public long Size => 0x800;
 
         public IReadOnlyDictionary<int, IGPIO> Connections { get; }
 
