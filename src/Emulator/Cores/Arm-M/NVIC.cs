@@ -78,6 +78,10 @@ namespace Antmicro.Renode.Peripherals.IRQControllers
             return targetInterruptSecurityState[interruptNumber];
         }
 
+        /// <remarks>
+        /// NOTE: RFKXX is not respected here. `tlib_nvic_find_pending_irq()`
+        /// does not respect PRIMASK/BASEPRI/FAULTMASK.
+        /// </remarks>
         public int? FindPendingInterrupt()
         {
             lock(irqs)
@@ -1023,9 +1027,36 @@ namespace Antmicro.Renode.Peripherals.IRQControllers
             return (int)(offset + (externalInterrupt ? 16 : 0));
         }
 
+        private static bool IsAnException(int interrupt)
+        {
+            return Enum.IsDefined(typeof(SystemException), interrupt);
+        }
+
+        private static bool IsSynchronousException(int interrupt)
+        {
+            if(IsAnException(interrupt))
+            {
+                var exception = (SystemException)interrupt;
+                switch(exception)
+                {
+                // These are the asynchronous system exceptions
+                // Taken from https://support.arm.com/documentation/107706/0100/Exceptions-and-interrupts-overview/Classification-of-synchronous-and-asynchronous-exceptions
+                case SystemException.NMI:
+                case SystemException.SysTick:
+                case SystemException.SysTick_S:
+                case SystemException.PendSV:
+                case SystemException.PendSV_S:
+                    return false;
+                default:
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private static string ExceptionToString(int exception)
         {
-            if(Enum.IsDefined(typeof(SystemException), exception))
+            if(IsAnException(exception))
             {
                 return ((SystemException)exception).ToString();
             }
@@ -1937,7 +1968,11 @@ namespace Antmicro.Renode.Peripherals.IRQControllers
             case RegistersV7.Control:
                 if((mpuControlRegister & 0x1) != (value & 0x1))
                 {
-                    this.cpu.MPUEnabled = (value & 0x1) != 0x0;
+                    cpu.MPUEnabled = (value & 0x1) != 0x0;
+                }
+                if((mpuControlRegister & 0x4) != (value & 0x4))
+                {
+                    cpu.MPUPrivdefena = (value & 0x4) != 0x0;
                 }
                 mpuControlRegister = value;
                 break;
@@ -2252,6 +2287,12 @@ namespace Antmicro.Renode.Peripherals.IRQControllers
 
         private void SetPendingWithoutEscalation(int i)
         {
+            if(IsSynchronousException(i) && (irqs[i] & IRQState.Active) != 0)
+            {
+                this.ErrorLog($"Ignoring request to set {ExceptionToString(i)} pending.");
+                return;
+            }
+
             var before = irqs[i];
             irqs[i] |= IRQState.Pending;
             pendingIRQs.Add(i);

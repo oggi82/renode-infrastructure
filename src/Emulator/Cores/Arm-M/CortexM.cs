@@ -274,12 +274,16 @@ namespace Antmicro.Renode.Peripherals.CPU
                     mveProfileFeature.Registers.Add(new GDBRegisterDescriptor((uint)CortexMRegisters.VPR, 32, "vpr", "vpr_reg", "vector"));
                     features.Add(mveProfileFeature);
                 }
-                var mSecextFeature = new GDBFeatureDescriptor("org.gnu.gdb.arm.secext");
-                mSecextFeature.Registers.Add(new GDBRegisterDescriptor((uint)CortexMRegisters.MSPS, 32, "msp_s", "uint32", "general"));
-                mSecextFeature.Registers.Add(new GDBRegisterDescriptor((uint)CortexMRegisters.PSPS, 32, "psp_s", "uint32", "general"));
-                mSecextFeature.Registers.Add(new GDBRegisterDescriptor((uint)CortexMRegisters.MSPNS, 32, "msp_ns", "uint32", "general"));
-                mSecextFeature.Registers.Add(new GDBRegisterDescriptor((uint)CortexMRegisters.PSPNS, 32, "psp_ns", "uint32", "general"));
-                features.Add(mSecextFeature);
+
+                if(TrustZoneEnabled)
+                {
+                    var mSecextFeature = new GDBFeatureDescriptor("org.gnu.gdb.arm.secext");
+                    mSecextFeature.Registers.Add(new GDBRegisterDescriptor((uint)CortexMRegisters.MSPS, 32, "msp_s", "uint32", "general"));
+                    mSecextFeature.Registers.Add(new GDBRegisterDescriptor((uint)CortexMRegisters.PSPS, 32, "psp_s", "uint32", "general"));
+                    mSecextFeature.Registers.Add(new GDBRegisterDescriptor((uint)CortexMRegisters.MSPNS, 32, "msp_ns", "uint32", "general"));
+                    mSecextFeature.Registers.Add(new GDBRegisterDescriptor((uint)CortexMRegisters.PSPNS, 32, "psp_ns", "uint32", "general"));
+                    features.Add(mSecextFeature);
+                }
 
                 // +++++ Important
                 // tlibs implement VFP using DOUBLE PRECISION FP (64 bit) registers.
@@ -453,6 +457,19 @@ namespace Antmicro.Renode.Peripherals.CPU
         {
             get => GetTrustZoneRelatedRegister(nameof(PmsaV8Mair1_NS), () => tlibGetPmsav8Mair(1, 0));
             set => SetTrustZoneRelatedRegister(nameof(PmsaV8Mair1_NS), val => tlibSetPmsav8Mair(1, val, 0), value);
+        }
+
+        public bool MPUPrivdefena
+        {
+            get
+            {
+                return tlibIsPrivdefenaEnabled() != 0;
+            }
+
+            set
+            {
+                tlibSetPrivdefena(value ? 1u : 0u);
+            }
         }
 
         public bool MPUEnabled
@@ -1348,6 +1365,12 @@ namespace Antmicro.Renode.Peripherals.CPU
 
         [Import]
         private readonly Action<int> tlibEnableMpu;
+
+        [Import]
+        private readonly Action<uint> tlibSetPrivdefena;
+
+        [Import]
+        private readonly Func<uint> tlibIsPrivdefenaEnabled;
 
         [Import]
         private readonly Func<int> tlibIsMpuEnabled;

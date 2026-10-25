@@ -47,9 +47,8 @@ namespace Antmicro.Renode.UI
             }
             if(options.ServerMode)
             {
-                // This is only http endoint - 29170 is used for backward compatibility with ws proxy
-                // it does not create new socket
-                Logger.AddBackend(new WebSocketNetworkBackend("/telnet/29170", false), "network");
+                Logger.AddBackend(new WebSocketNetworkBackend("/logs", false), "network");
+                new WebSocketUartServer();
             }
 
             Logger.AddBackend(new MemoryBackend(), "memory");
@@ -123,12 +122,13 @@ namespace Antmicro.Renode.UI
                     Name = "Shell thread"
                 }.Start();
 
-                Emulator.BeforeExit += () =>
+                var cleanup = () =>
                 {
                     Emulator.DisposeAll();
                     ui?.Dispose();
                     ui = null;
                 };
+                Emulator.RegisterCleanUp(cleanup);
 
                 if(beforeRun != null)
                 {
@@ -192,7 +192,7 @@ namespace Antmicro.Renode.UI
             }
             else if(options.ServerMode)
             {
-                var socket = new WebSocketIOSource("/telnet/29169");
+                var socket = new WebSocketIOSource("/monitor");
                 ioSource = socket;
                 size = socket;
             }
